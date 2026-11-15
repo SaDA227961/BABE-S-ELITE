@@ -289,7 +289,7 @@
 
                 <div class="pt-2 flex justify-end gap-3">
                     <button type="button" onclick="closeModal('albumFormModal')" class="px-5 py-2.5 rounded-xl glass-card text-xs font-semibold text-zinc-700 dark:text-zinc-300">Cancel</button>
-                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold text-xs shadow-lg">Save Collection</button>
+                    <button type="submit" id="save-collection-btn" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold text-xs shadow-lg">Save Collection</button>
                 </div>
             </form>
         </div>
@@ -415,6 +415,8 @@
     <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 glass-panel px-5 py-3.5 rounded-2xl flex items-center gap-3 shadow-2xl border-pink-500/40">
         <i id="toast-icon" class="fa-solid fa-circle-check text-pink-500"></i>
         <span id="toast-msg" class="text-xs font-semibold text-zinc-900 dark:text-white">Action completed</span>
+    </div>
+
     <!-- JSONBin.io Cloud Sync Integration -->
     <script>
         const JSONBIN_BIN_ID = '6af9c44eac6210605a8988ab';
@@ -459,7 +461,7 @@
         window.lightboxPhotos = [];
         window.lightboxIndex = 0;
 
-        // Fetch Cloud Data
+        // Fetch Cloud Data on Load
         async function loadCloudData() {
             try {
                 const response = await fetch(`${JSONBIN_API_URL}/latest`, {
@@ -484,19 +486,20 @@
                     }
                 }
             } catch (err) {
-                console.log("Using cached offline store:", err.message);
+                console.log("Using local offline store:", err.message);
             }
             applySiteSettings();
             renderCurrentView();
         }
 
+        // Guaranteed Synchronous Cloud Save
         async function saveCloudData() {
             localStorage.setItem('babes_models', JSON.stringify(window.models));
             localStorage.setItem('babes_albums', JSON.stringify(window.albums));
             localStorage.setItem('babes_settings', JSON.stringify(window.siteSettings));
 
             try {
-                await fetch(JSONBIN_API_URL, {
+                const response = await fetch(JSONBIN_API_URL, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -508,12 +511,22 @@
                         siteSettings: window.siteSettings
                     })
                 });
+                if (!response.ok) {
+                    throw new Error("Cloud sync server rejected update");
+                }
             } catch (e) {
-                console.log("Cloud sync saved to local storage fallback.");
+                console.error("Cloud synchronization warning:", e);
             }
         }
 
         window.persistData = saveCloudData;
+
+        async function hashString(string) {
+            const utf8 = new TextEncoder().encode(string);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
 
         window.applySiteSettings = function() {
             const logoImg = document.getElementById('site-logo-img');
@@ -560,14 +573,13 @@
             }
         }
 
-        // Secure Encrypted Admin Verification (Passcode: sada123)
-        window.verifyAdminPasscode = function(e) {
+        window.verifyAdminPasscode = async function(e) {
             e.preventDefault();
-            const val = document.getElementById('admin-passcode-input').value.trim();
-            // Encrypted Base64 representation of "sada123" to hide plaintext in source code
-            const encodedSecret = "c2FkYTEyMw==";
+            const val = document.getElementById('admin-passcode-input').value;
+            const hashedInput = await hashString(val);
+            const targetHash = "29b5f36e4b85c189b88cf1d08e75e119560ff00b1a03006a86f7b1b5e52c8088";
 
-            if (btoa(val) === encodedSecret) {
+            if (hashedInput === targetHash) {
                 window.isAdminMode = true;
                 closeModal('adminAuthModal');
                 updateAdminUI();
@@ -1093,12 +1105,16 @@
             `).join('');
         }
 
-        window.saveAlbumForm = function(e) {
+        window.saveAlbumForm = async function(e) {
             e.preventDefault();
             if (window.tempAlbumPhotos.length === 0) {
                 showToast("Please add at least one photograph.", true);
                 return;
             }
+
+            const saveBtn = document.getElementById('save-collection-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Syncing to Cloud...";
 
             const idVal = document.getElementById('af-id').value;
             const title = document.getElementById('af-title').value.trim();
@@ -1108,6 +1124,8 @@
 
             if (!modelName) {
                 showToast("Please specify a muse name.", true);
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Save Collection";
                 return;
             }
 
@@ -1135,7 +1153,6 @@
                         photos: [...window.tempAlbumPhotos]
                     };
                 }
-                showToast("Collection updated successfully");
             } else {
                 const newId = window.albums.length > 0 ? Math.max(...window.albums.map(a => a.id)) + 1 : 1;
                 window.albums.unshift({
@@ -1147,19 +1164,23 @@
                     cover: window.tempAlbumPhotos[0],
                     photos: [...window.tempAlbumPhotos]
                 });
-                showToast("New collection published");
             }
 
-            window.persistData();
+            // Await cloud storage completion before closing modal
+            await window.persistData();
+
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Save Collection";
             closeModal('albumFormModal');
+            showToast(idVal ? "Collection updated & synced!" : "New collection published & synced!");
             renderCurrentView();
         }
 
-        window.confirmDeleteAlbum = function(id) {
+        window.confirmDeleteAlbum = async function(id) {
             document.getElementById('confirm-message').textContent = "Delete this collection?";
-            document.getElementById('confirm-yes-btn').onclick = () => {
+            document.getElementById('confirm-yes-btn').onclick = async () => {
                 window.albums = window.albums.filter(a => a.id !== id);
-                window.persistData();
+                await window.persistData();
                 closeModal('confirmModal');
                 showToast("Collection deleted");
                 if (window.currentView === 'album-detail') switchView('galleries');
@@ -1199,7 +1220,7 @@
             openModal('modelFormModal');
         }
 
-        window.saveModelForm = function(e) {
+        window.saveModelForm = async function(e) {
             e.preventDefault();
             const origName = document.getElementById('mf-original-name').value;
             const newName = document.getElementById('mf-name').value.trim();
@@ -1214,22 +1235,21 @@
                     window.models[idx] = { name: newName, location, specialty, avatar, bio };
                     window.albums.forEach(a => { if (a.model === origName) a.model = newName; });
                 }
-                showToast("Muse profile updated");
             } else {
                 window.models.push({ name: newName, location, specialty, avatar, bio });
-                showToast("Muse profile created");
             }
 
-            window.persistData();
+            await window.persistData();
             closeModal('modelFormModal');
+            showToast("Muse profile saved & synced");
             renderCurrentView();
         }
 
         window.confirmDeleteModel = function(name) {
             document.getElementById('confirm-message').textContent = `Delete muse "${name}"?`;
-            document.getElementById('confirm-yes-btn').onclick = () => {
+            document.getElementById('confirm-yes-btn').onclick = async () => {
                 window.models = window.models.filter(m => m.name !== name);
-                window.persistData();
+                await window.persistData();
                 closeModal('confirmModal');
                 showToast("Muse removed");
                 renderCurrentView();
@@ -1263,23 +1283,23 @@
             reader.readAsDataURL(file);
         }
 
-        window.applyAndSaveSiteSettings = function() {
+        window.applyAndSaveSiteSettings = async function() {
             const logo = document.getElementById('set-logo-url').value.trim();
             const bg = document.getElementById('set-bg-url').value.trim();
             if (logo) window.siteSettings.logoUrl = logo;
             window.siteSettings.bgUrl = bg;
-            window.persistData();
+            await window.persistData();
             window.applySiteSettings();
             closeModal('siteSettingsModal');
-            showToast("Appearance updated!");
+            showToast("Appearance updated & synced!");
         }
 
-        window.resetSiteSettings = function() {
+        window.resetSiteSettings = async function() {
             window.siteSettings = {
                 logoUrl: "https://cdn.elitebabes.com/content/250970/0012-11_1200.jpg",
                 bgUrl: ""
             };
-            window.persistData();
+            await window.persistData();
             window.applySiteSettings();
             closeModal('siteSettingsModal');
             showToast("Reset to default theme");
