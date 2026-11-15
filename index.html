@@ -417,11 +417,9 @@
         <span id="toast-msg" class="text-xs font-semibold text-zinc-900 dark:text-white">Action completed</span>
     </div>
 
-    <!-- JSONBin.io Cloud Sync & Secure Admin Integration -->
+    <!-- Npoint.io Cloud Sync & Secure Admin Integration -->
     <script>
-        const JSONBIN_BIN_ID = '6af9c44eac6210605a8988ab';
-        const JSONBIN_MASTER_KEY = '$2a$10$zdFYauCYjW01odEO9hlS1uA00zXrSm5JKEZP2GGdgA8y3sf4ge2JO';
-        const JSONBIN_API_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+        const NPOINT_API_URL = 'https://api.npoint.io/73fec1297e99907a1f56';
 
         const defaultModels = [
             { name: "Aria Vance", location: "Paris, France", specialty: "Fine Art Nude", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80", bio: "Fine art figure muse celebrating natural grace." },
@@ -461,15 +459,10 @@
         window.lightboxPhotos = [];
         window.lightboxIndex = 0;
 
-        // Fetch Cloud Data on Load
+        // Fetch Cloud Data from Npoint on Load
         async function loadCloudData() {
             try {
-                const response = await fetch(`${JSONBIN_API_URL}/latest`, {
-                    headers: {
-                        'X-Access-Key': JSONBIN_MASTER_KEY,
-                        'X-Bin-Meta': 'false'
-                    }
-                });
+                const response = await fetch(NPOINT_API_URL);
                 if (response.ok) {
                     const record = await response.json();
                     if (record && record.albums && record.albums.length > 0) {
@@ -492,18 +485,17 @@
             renderCurrentView();
         }
 
-        // Guaranteed Synchronous Cloud Save
+        // Guaranteed Synchronous Npoint Cloud Save (POST)
         async function saveCloudData() {
             localStorage.setItem('babes_models', JSON.stringify(window.models));
             localStorage.setItem('babes_albums', JSON.stringify(window.albums));
             localStorage.setItem('babes_settings', JSON.stringify(window.siteSettings));
 
             try {
-                await fetch(JSONBIN_API_URL, {
-                    method: 'PUT',
+                await fetch(NPOINT_API_URL, {
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Access-Key': JSONBIN_MASTER_KEY
                     },
                     body: JSON.stringify({
                         albums: window.albums,
@@ -563,7 +555,7 @@
             }
         }
 
-        // Secure password validation without displaying raw password
+        // Clean plain text verification for sada123
         window.verifyAdminPasscode = function(e) {
             e.preventDefault();
             const val = document.getElementById('admin-passcode-input').value.trim();
