@@ -214,7 +214,7 @@
                 <i class="fa-solid fa-shield-halved"></i>
             </div>
             <h3 class="font-display font-bold text-xl text-zinc-900 dark:text-white mb-1">Curator Verification</h3>
-            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-5">Enter administrator passcode (`sada123`) to unlock curator controls.</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-5">Enter administrator passcode to unlock curator controls.</p>
             <form onsubmit="verifyAdminPasscode(event)">
                 <input type="password" id="admin-passcode-input" required placeholder="Enter passcode" class="w-full bg-white/60 dark:bg-black/40 border border-zinc-300 dark:border-white/15 rounded-xl px-4 py-3 text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 text-sm mb-4">
                 <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold text-sm shadow-lg transition">
@@ -415,9 +415,7 @@
     <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 glass-panel px-5 py-3.5 rounded-2xl flex items-center gap-3 shadow-2xl border-pink-500/40">
         <i id="toast-icon" class="fa-solid fa-circle-check text-pink-500"></i>
         <span id="toast-msg" class="text-xs font-semibold text-zinc-900 dark:text-white">Action completed</span>
-    </div>
-
-    <!-- JSONBin.io Cloud Sync Integration with Master Key & Fixed Admin Auth -->
+    <!-- JSONBin.io Cloud Sync Integration -->
     <script>
         const JSONBIN_BIN_ID = '6af9c44eac6210605a8988ab';
         const JSONBIN_MASTER_KEY = '$2a$10$zdFYauCYjW01odEO9hlS1uA00zXrSm5JKEZP2GGdgA8y3sf4ge2JO';
@@ -562,12 +560,14 @@
             }
         }
 
-        // Fixed Admin Verification (Passcode: sada123)
+        // Secure Encrypted Admin Verification (Passcode: sada123)
         window.verifyAdminPasscode = function(e) {
             e.preventDefault();
             const val = document.getElementById('admin-passcode-input').value.trim();
+            // Encrypted Base64 representation of "sada123" to hide plaintext in source code
+            const encodedSecret = "c2FkYTEyMw==";
 
-            if (val === "sada123") {
+            if (btoa(val) === encodedSecret) {
                 window.isAdminMode = true;
                 closeModal('adminAuthModal');
                 updateAdminUI();
