@@ -214,7 +214,7 @@
                 <i class="fa-solid fa-shield-halved"></i>
             </div>
             <h3 class="font-display font-bold text-xl text-zinc-900 dark:text-white mb-1">Curator Verification</h3>
-            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-5">Enter administrator passcode (`sada123`) to unlock curator controls.</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-5">Enter administrator passcode to unlock curator controls.</p>
             <form onsubmit="verifyAdminPasscode(event)">
                 <input type="password" id="admin-passcode-input" required placeholder="Enter passcode" class="w-full bg-white/60 dark:bg-black/40 border border-zinc-300 dark:border-white/15 rounded-xl px-4 py-3 text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 text-sm mb-4">
                 <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold text-sm shadow-lg transition">
@@ -460,23 +460,34 @@
         window.lightboxPhotos = [];
         window.lightboxIndex = 0;
 
-        // Fetch data from JSONBin.io on startup
+        // Automatically fetch or initialize Cloud Bin data without manual edits
         async function loadCloudData() {
             try {
-                const response = await fetch(JSONBIN_API_URL, {
+                const response = await fetch(`${JSONBIN_API_URL}/latest`, {
                     headers: {
-                        'X-Access-Key': '$2a$10$B7N3T3vH1...public_read_or_master_key' // JSONBin public read
+                        'X-Bin-Meta': 'false'
                     }
                 });
                 if (response.ok) {
-                    const json = await response.json();
-                    const record = json.record;
-                    if (record && record.albums) window.albums = record.albums;
-                    if (record && record.models) window.models = record.models;
-                    if (record && record.siteSettings) window.siteSettings = record.siteSettings;
+                    const record = await response.json();
+                    if (record && record.albums && record.albums.length > 0) {
+                        window.albums = record.albums;
+                        localStorage.setItem('babes_albums', JSON.stringify(window.albums));
+                    } else {
+                        // Auto-populate cloud bin if it's completely empty
+                        await saveCloudData();
+                    }
+                    if (record && record.models && record.models.length > 0) {
+                        window.models = record.models;
+                        localStorage.setItem('babes_models', JSON.stringify(window.models));
+                    }
+                    if (record && record.siteSettings) {
+                        window.siteSettings = record.siteSettings;
+                        localStorage.setItem('babes_settings', JSON.stringify(window.siteSettings));
+                    }
                 }
             } catch (err) {
-                console.log("Using offline cache store:", err.message);
+                console.log("Using cached offline store:", err.message);
             }
             applySiteSettings();
             renderCurrentView();
@@ -500,7 +511,7 @@
                     })
                 });
             } catch (e) {
-                console.log("Cloud sync saved to local cache.");
+                console.log("Cloud sync saved to local storage fallback.");
             }
         }
 
@@ -562,7 +573,7 @@
             e.preventDefault();
             const val = document.getElementById('admin-passcode-input').value;
             const hashedInput = await hashString(val);
-            const targetHash = await hashString("sada123");
+            const targetHash = "29b5f36e4b85c189b88cf1d08e75e119560ff00b1a03006a86f7b1b5e52c8088";
 
             if (hashedInput === targetHash) {
                 window.isAdminMode = true;
